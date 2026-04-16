@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - 2026-04-17
+
+### Added
+- `src/polypharmacy_risk_scorer.py`: new module that scores a patient medication
+  list by total DDI burden — enumerates all pairwise interactions, applies
+  severity weights (`minor=1`, `moderate=3`, `major=7`, `contraindicated=15`),
+  sums into a `total_score`, and classifies regimens as `"low"`, `"high"`, or
+  `"critical"`.  Flags polypharmacy when 5 or more drugs are present.
+- `RiskReport` and `PairScore` frozen dataclasses for immutable, type-safe
+  result objects.
+- `score_regimen()` function with full input validation, deduplication, and
+  configurable thresholds and weights.
+- `report_to_dataframe()` helper to flatten a `RiskReport` into a sorted
+  pair-score DataFrame.
+- `tests/test_polypharmacy_risk_scorer.py`: 29 pytest tests covering happy path,
+  single-drug, unknown drugs, duplicate deduplication, contraindicated flagging,
+  polypharmacy threshold, input validation, determinism, and custom weights.
+- README "New: Polypharmacy Risk Scorer" section with step-by-step usage,
+  sample output, custom threshold examples, and API reference table.
+
 ## [0.2.0] - 2026-04-16
 
 ### Added

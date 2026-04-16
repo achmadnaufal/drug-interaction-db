@@ -70,6 +70,96 @@ Contraindicated combination detected!
 High-risk drugs in dataset: ['ace_inhibitors', 'allopurinol', 'amiodarone', ...]
 ```
 
+## New: Polypharmacy Risk Scorer
+
+The `src/polypharmacy_risk_scorer.py` module quantifies the total DDI burden for
+a patient's full medication list by scoring every pairwise combination and
+aggregating into a single risk report.
+
+### How It Works
+
+1. Every unique drug pair is looked up in the loaded interaction database.
+2. The highest severity level for each pair is mapped to a numeric weight
+   (`minor=1`, `moderate=3`, `major=7`, `contraindicated=15`).
+3. Pair scores are summed into a `total_score`.
+4. The regimen is classified as `"low"`, `"high"` (score ≥ 10), or
+   `"critical"` (score ≥ 25 or any contraindicated pair).
+5. A `polypharmacy_flagged` flag is set when 5 or more drugs are present.
+
+### Step-by-Step Usage
+
+```python
+from src.main import DrugInteractionDB
+from src.polypharmacy_risk_scorer import score_regimen, report_to_dataframe
+
+# 1. Load the interaction database
+db = DrugInteractionDB()
+db.load_data("demo/sample_data.csv")
+
+# 2. Define the patient's medication list
+patient_meds = ["warfarin", "aspirin", "fluconazole", "simvastatin", "amiodarone"]
+
+# 3. Score the regimen
+report = score_regimen(patient_meds, db)
+
+# 4. Inspect the summary
+print(f"Total DDI burden score : {report.total_score}")
+print(f"Risk level             : {report.risk_level}")
+print(f"Interacting pairs      : {report.interacting_pairs} / {report.total_pairs}")
+print(f"Contraindicated pair   : {report.has_contraindicated}")
+print(f"Polypharmacy flagged   : {report.polypharmacy_flagged}")
+
+# 5. View the per-pair breakdown as a DataFrame
+df = report_to_dataframe(report)
+print(df[["drug_a", "drug_b", "severity", "pair_score"]])
+```
+
+### Sample Output
+
+```
+Total DDI burden score : 49.0
+Risk level             : critical
+Interacting pairs      : 5 / 10
+Contraindicated pair   : False
+Polypharmacy flagged   : True
+
+          drug_a      drug_b severity  pair_score
+0     simvastatin  amiodarone    major        14.0
+1        warfarin     aspirin    major         7.0
+2        warfarin  fluconazole   major         7.0
+3        digoxin   amiodarone    major         7.0
+...
+```
+
+### Custom Thresholds and Weights
+
+```python
+# Override severity weights and risk thresholds
+custom_weights = {"minor": 1.0, "moderate": 2.0, "major": 5.0, "contraindicated": 20.0}
+report = score_regimen(
+    patient_meds, db,
+    severity_weights=custom_weights,
+    high_threshold=15.0,
+    critical_threshold=40.0,
+    polypharmacy_count=4,
+)
+```
+
+### Polypharmacy Risk Scorer API
+
+| Function / Class | Description |
+|---|---|
+| `score_regimen(drugs, db, ...)` | Score a medication list; returns a frozen `RiskReport` |
+| `report_to_dataframe(report)` | Flatten a `RiskReport` to a pair-score DataFrame |
+| `RiskReport` | Frozen dataclass with score, risk level, and pair details |
+| `PairScore` | Frozen dataclass with per-pair severity, weight, and score |
+| `SEVERITY_WEIGHTS` | Default weight mapping (`minor=1` → `contraindicated=15`) |
+| `HIGH_BURDEN_THRESHOLD` | Score threshold for `"high"` risk (default: 10.0) |
+| `CRITICAL_BURDEN_THRESHOLD` | Score threshold for `"critical"` risk (default: 25.0) |
+| `POLYPHARMACY_DRUG_COUNT` | Minimum drugs for polypharmacy flag (default: 5) |
+
+---
+
 ## Sample Data
 
 The file `demo/sample_data.csv` contains 20 clinically representative
