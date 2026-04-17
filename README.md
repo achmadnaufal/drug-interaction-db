@@ -160,6 +160,89 @@ report = score_regimen(
 
 ---
 
+## New: CYP450 Enzyme-Mediated Interaction Tagger
+
+The `src/cyp450_tagger.py` module scans the `mechanism` text of every DDI
+record and labels each row with the cytochrome P450 isoenzymes (and related
+transporters such as P-glycoprotein) implicated in the interaction.  Use it
+to filter pharmacokinetic interactions by metabolic pathway or to generate
+clinician-facing summaries grouped by enzyme.
+
+> **Disclaimer:** illustrative/educational data only — not clinical advice
+> and not endorsed by the FDA.
+
+### How It Works
+
+1. Each ``mechanism`` string is matched against a curated catalogue of
+   known enzymes (CYP1A2, CYP2C9, CYP2C19, CYP2D6, CYP3A4, P-glycoprotein,
+   and others) using word-boundary-aware, case-insensitive regex.
+2. The mechanism is also classified as ``"inhibitor"``, ``"inducer"``, or
+   ``"unspecified"`` based on keyword presence.
+3. Results are returned as immutable `EnzymeTag` tuples or appended to the
+   DataFrame as ``cyp_enzymes`` and ``cyp_role`` columns.
+
+### Step-by-Step Usage
+
+```python
+from src import (
+    DrugInteractionDB,
+    extract_enzymes,
+    filter_by_enzyme,
+    summarise_by_enzyme,
+    tag_interactions,
+)
+
+# 1. Load the interaction database
+db = DrugInteractionDB()
+db.load_data("demo/sample_data.csv")
+
+# 2. Tag every row with CYP enzyme involvement
+tagged = tag_interactions(db._df)
+print(tagged[["drug_a", "drug_b", "cyp_enzymes", "cyp_role"]].head())
+
+# 3. Aggregate counts by enzyme
+summary = summarise_by_enzyme(db._df)
+print(summary)
+
+# 4. Find every CYP3A4-inhibitor-mediated interaction
+cyp3a4_inhib = filter_by_enzyme(db, "CYP3A4", role="inhibitor")
+print(cyp3a4_inhib[["drug_a", "drug_b", "severity", "recommendation"]])
+
+# 5. Tag a single mechanism string ad-hoc
+tags = extract_enzymes("Amiodarone inhibits CYP3A4 and CYP2C9")
+for t in tags:
+    print(f"{t.enzyme}: {t.role}")
+```
+
+### Sample Output
+
+```
+       drug_a       drug_b   cyp_enzymes   cyp_role
+0    warfarin      aspirin                         
+1    warfarin  fluconazole        CYP2C9  inhibitor
+2 simvastatin   amiodarone CYP3A4, CYP2C9 inhibitor
+3    metformin contrast_iodine                     
+4 clopidogrel    omeprazole       CYP2C19 inhibitor
+
+  enzyme  inhibitor_count  inducer_count  unspecified_count  total
+0 CYP3A4                4              1                  0      5
+1 CYP2C9                3              0                  0      3
+...
+```
+
+### CYP450 Tagger API
+
+| Function / Class | Description |
+|---|---|
+| `extract_enzymes(mechanism)` | Parse a single mechanism string; returns a tuple of `EnzymeTag` |
+| `tag_interactions(df)` | Append `cyp_enzymes` and `cyp_role` columns to a DDI DataFrame |
+| `summarise_by_enzyme(df)` | Aggregate inhibitor / inducer / unspecified counts per enzyme |
+| `filter_by_enzyme(db, enzyme, role=None)` | Return rows mentioning *enzyme*, optionally restricted by role |
+| `EnzymeTag` | Frozen dataclass with `enzyme` and `role` fields |
+| `KNOWN_ENZYMES` | Tuple of recognised CYP450 isoforms and transporters |
+
+---
+
 ## Sample Data
 
 The file `demo/sample_data.csv` contains 20 clinically representative

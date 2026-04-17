@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - 2026-04-18
+
+### Added
+- `src/cyp450_tagger.py`: new module that scans the `mechanism` text of every
+  DDI record and tags each row with the CYP450 isoenzymes (and related
+  transporters such as P-glycoprotein) implicated in the interaction.
+- `extract_enzymes(mechanism)`: pure function returning a tuple of immutable
+  `EnzymeTag` objects, with case-insensitive, word-boundary-aware matching.
+- `tag_interactions(df)`: appends `cyp_enzymes` and `cyp_role` columns to a
+  DDI DataFrame without mutating the input.
+- `summarise_by_enzyme(df)`: aggregates inhibitor / inducer / unspecified
+  counts per enzyme, sorted by total descending.
+- `filter_by_enzyme(db, enzyme, role=None)`: returns interaction rows that
+  mention a given CYP isoform, optionally restricted by metabolic role.
+- `EnzymeTag` frozen dataclass and `KNOWN_ENZYMES` constant tuple covering
+  common CYP isoforms (CYP1A2, CYP2C9, CYP2C19, CYP2D6, CYP3A4, ...) plus
+  P-glycoprotein, UGT1A1, and OATP1B1.
+- `tests/test_cyp450_tagger.py`: 36 pytest tests covering happy path,
+  empty/whitespace/None input, NaN handling, missing column, unknown
+  enzyme/role, case sensitivity, word-boundary protection, role precedence
+  (inhibition over induction), and immutability of input DataFrames.
+- `src/__init__.py`: re-exports the new public API alongside the existing
+  `DrugInteractionDB` and polypharmacy scorer entry points.
+- README "New: CYP450 Enzyme-Mediated Interaction Tagger" section with
+  step-by-step usage, sample output, and API reference table.
+
 ## [Unreleased] - 2026-04-17
 
 ### Added
