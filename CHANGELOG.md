@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - 2026-04-19
+
+### Added
+- `src/alternative_suggester.py`: new module that proposes safer replacement
+  drugs from the same therapeutic class when a patient's regimen contains a
+  drug causing a problematic interaction.  Ships a curated
+  `THERAPEUTIC_CLASSES` registry (PPIs, SSRIs, statins, macrolides, azole
+  antifungals, NSAIDs, ACE inhibitors, anticoagulants) and scores each
+  candidate against the rest of the regimen using the severity weights from
+  the polypharmacy scorer.
+- `suggest_alternatives(target, regimen, db, ...)`: returns an immutable
+  tuple of `AlternativeSuggestion` objects sorted by ascending DDI burden.
+  Handles unknown drugs (returns empty tuple), empty regimens (raises
+  `ValueError`), duplicate entries (deduplicated internally), and
+  case-insensitive matching.
+- `suggestions_to_dataframe(suggestions)`: flattens a suggestions tuple into
+  a pandas DataFrame for reporting.
+- `list_classes()`: exposes the registered therapeutic class names.
+- `AlternativeSuggestion` frozen dataclass with `candidate`,
+  `therapeutic_class`, `total_score`, `highest_severity`,
+  `interacting_drugs`, and `is_safer` fields.
+- `tests/test_alternative_suggester.py`: 27 pytest tests covering happy
+  path, case-insensitivity, unknown drugs, empty / duplicate regimens,
+  max-results capping, `is_safer` flag semantics, full input validation,
+  DataFrame round-tripping, and class-registry invariants.
+- `src/__init__.py`: re-exports the new public API.
+- README top-level "Disclaimer — Not Medical Advice" block, a
+  "Severity Classification" table, and a "New: Alternative-Drug Suggester"
+  section with step-by-step usage, example output, and an API reference.
+
 ## [Unreleased] - 2026-04-18
 
 ### Added

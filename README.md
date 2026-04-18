@@ -8,6 +8,24 @@
 
 Drug-drug interaction database query and risk assessment tools.
 
+> **Disclaimer — Not Medical Advice.** This project is an educational and
+> illustrative tool for software engineers, pharmacy informatics students,
+> and researchers.  The bundled dataset is a small hand-curated sample and
+> is **not** a comprehensive or validated clinical reference.  Nothing in
+> this repository should be used to prescribe, adjust, or discontinue any
+> medication.  Always consult a licensed clinician and an up-to-date
+> authoritative drug information source (e.g. Lexicomp, Micromedex,
+> Stockley's, or the product label) before making any clinical decision.
+
+## Severity Classification
+
+| Level | Meaning | Typical Action |
+|---|---|---|
+| `minor` | Limited clinical significance; little or no action required | Document; continue therapy |
+| `moderate` | Interaction may worsen the patient's condition or require monitoring | Monitor labs / symptoms; consider dose adjustment |
+| `major` | Potentially serious or life-threatening; use alternatives when possible | Avoid or substitute; close monitoring if unavoidable |
+| `contraindicated` | Do not combine under any circumstance | Absolute avoidance; use a different agent |
+
 ## Features
 
 - Load interaction data from CSV or Excel files
@@ -243,6 +261,75 @@ for t in tags:
 
 ---
 
+## New: Alternative-Drug Suggester
+
+The `src/alternative_suggester.py` module proposes safer replacement drugs
+from the same therapeutic class when a patient's regimen contains a drug
+that is causing a problematic interaction.  A curated class registry groups
+drugs by indication (PPIs, SSRIs, statins, macrolides, azole antifungals,
+NSAIDs, ACE inhibitors, anticoagulants).
+
+### How It Works
+
+1. The target drug is matched against `THERAPEUTIC_CLASSES` to identify its class.
+2. Every other member of that class is scored against the rest of the regimen
+   using the same severity weights as the polypharmacy scorer
+   (`minor=1`, `moderate=3`, `major=7`, `contraindicated=15`).
+3. Candidates are returned as immutable `AlternativeSuggestion` tuples, sorted
+   by ascending total DDI burden — the safest alternative first.
+4. Each suggestion carries an `is_safer` flag indicating whether the candidate
+   scores strictly lower than the current target against the regimen.
+
+### Step-by-Step Usage
+
+```python
+from src.main import DrugInteractionDB
+from src.alternative_suggester import (
+    suggest_alternatives,
+    suggestions_to_dataframe,
+)
+
+db = DrugInteractionDB()
+db.load_data("demo/sample_data.csv")
+
+# Clopidogrel + omeprazole is a known moderate interaction.
+# Suggest an alternative PPI that is safer with clopidogrel.
+suggestions = suggest_alternatives(
+    target="omeprazole",
+    regimen=["clopidogrel", "omeprazole", "aspirin"],
+    db=db,
+)
+
+for s in suggestions:
+    print(f"{s.candidate:<15} score={s.total_score:<5} "
+          f"severity={s.highest_severity:<10} safer={s.is_safer}")
+
+# Flatten to a DataFrame for reporting
+df = suggestions_to_dataframe(suggestions)
+print(df)
+```
+
+### Example Output
+
+```
+pantoprazole    score=0.0   severity=none       safer=True
+esomeprazole    score=0.0   severity=none       safer=True
+lansoprazole    score=0.0   severity=none       safer=True
+rabeprazole     score=0.0   severity=none       safer=True
+```
+
+### Alternative-Suggester API
+
+| Function / Class | Description |
+|---|---|
+| `suggest_alternatives(target, regimen, db, ...)` | Return sorted tuple of candidates, safest first |
+| `suggestions_to_dataframe(suggestions)` | Flatten suggestions into a tabular DataFrame |
+| `list_classes()` | Return the tuple of registered therapeutic class names |
+| `AlternativeSuggestion` | Frozen dataclass with candidate, score, severity, and safer flag |
+| `THERAPEUTIC_CLASSES` | Curated mapping of class name to member drug tuple |
+
+---
+
 ## Sample Data
 
 The file `demo/sample_data.csv` contains 20 clinically representative
@@ -311,8 +398,11 @@ Exact duplicate rows are removed during preprocessing.
 drug-interaction-db/
 ├── src/
 │   ├── __init__.py
-│   ├── main.py              # Core DrugInteractionDB class
-│   └── data_generator.py    # Curated sample data generator
+│   ├── main.py                    # Core DrugInteractionDB class
+│   ├── polypharmacy_risk_scorer.py  # Regimen DDI burden scorer
+│   ├── cyp450_tagger.py           # CYP450 enzyme tagger
+│   ├── alternative_suggester.py   # Safer-alternative suggester
+│   └── data_generator.py          # Curated sample data generator
 ├── demo/
 │   └── sample_data.csv      # 20-row realistic interaction dataset
 ├── tests/
